@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍌 Gemini 生图工坊 (ai.t8star.cn)</title>
+    <style>
+        /* 样式保持不变，可沿用之前的风格 */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0b0f15; color: #e3e7f0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .app { display: flex; flex: 1; overflow: hidden; gap: 1px; background: #1e2632; }
+        .sidebar { width: 340px; background: #131a24; display: flex; flex-direction: column; padding: 1.5rem 1rem; overflow-y: auto; border-right: 1px solid #2c3848; gap: 1.5rem; }
+        .sidebar h2 { font-size: 1.4rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; border-bottom: 1px solid #2f3e52; padding-bottom: 0.7rem; color: #b7e0ff; }
+        .control-group { background: #0e141c; border-radius: 16px; padding: 1.2rem 1rem; border: 1px solid #253241; }
+        .control-group label { font-size: 0.85rem; text-transform: uppercase; font-weight: 600; color: #9ab3d1; display: block; margin-bottom: 0.5rem; }
+        input, textarea, select { width: 100%; background: #1b2531; border: 1px solid #31435a; border-radius: 12px; padding: 0.7rem 1rem; color: white; font-size: 0.95rem; outline: none; }
+        input:focus, textarea:focus, select:focus { border-color: #5f8ec9; background: #1f2b3a; }
+        textarea { min-height: 80px; resize: vertical; }
+        .api-key-row { display: flex; gap: 8px; }
+        .file-upload-area { display: flex; flex-direction: column; gap: 12px; }
+        .file-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+    background: #10171f;
+    border-radius: 16px;
+    border: 1px dashed #415977;
+    min-height: 80px;
+}
+.file-preview .thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid #2d5f9e;
+    background: #1f2c3a;
+}
+.file-preview .placeholder {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    background: #1f2c3a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4f6180;
+    font-size: 24px;
+}
+.thumb-container {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 60px;
+}
+
+/* 缩略图本身（复用之前的 .thumb 样式，但可以微调） */
+.thumb-container .thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid #2d5f9e;
+    background: #1f2c3a;
+}
+
+/* 序号标签 */
+.thumb-container .thumb-index {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    background: #2d5f9e;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #10171f; /* 与背景融合 */
+}
+/* 移除按钮样式 */
+.thumb-remove {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    background: #ff4d4f;
+    color: white;
+    border-radius: 50%;
+    font-size: 16px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px solid #10171f;
+    line-height: 1;
+    transition: background 0.2s;
+    z-index: 2; /* 确保按钮在最上层 */
+}
+.thumb-remove:hover {
+    background: #ff7875;
+}
+
+/* 确保序号标签不会被按钮完全覆盖（已位于右下角，不冲突） */
+.thumb-container .thumb-index {
+    z-index: 1;
+}
+        .button-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+        button { background: #2b3d54; border: none; border-radius: 30px; padding: 0.7rem 1.4rem; font-weight: 600; color: white; cursor: pointer; border: 1px solid #406080; flex: 1 1 auto; font-size: 0.9rem; }
+        button.primary { background: #2d5f9e; border-color: #6298da; }
+        button.primary:hover { background: #3b70b5; }
+        button:hover { background: #324b68; }
+        .radio-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+        .radio-item { display: flex; align-items: center; gap: 5px; }
+        .radio-item input[type="radio"] { width: auto; accent-color: #4f8ed8; }
+        .model-select-row { display: flex; gap: 8px; }
+        .model-select-row select { flex: 2; }
+        .model-select-row input { flex: 3; }
+        .hint { font-size: 0.75rem; color: #6e85a8; margin-top: 5px; }
+        .gallery { flex: 1; background: #0e141c; display: flex; flex-direction: column; overflow: hidden; padding: 1.5rem; }
+        .gallery h3 { font-size: 1.2rem; font-weight: 400; margin-bottom: 1rem; color: #bdd3f0; display: flex; align-items: center; gap: 8px; }
+        .image-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.2rem; align-content: start; }
+        .image-card { background: #101821; border-radius: 18px; overflow: hidden; border: 1px solid #2d3f53; cursor: pointer; transition: 0.1s; }
+        .image-card:hover { border-color: #678fc0; transform: scale(1.01); }
+        .image-card img {width: 100%;height: auto; display: block; background: #1f2d3b;object-fit: contain;}
+       /* 图片放大模态框 */
+.lightbox {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.9);
+    overflow: auto;
+}
+.lightbox-content {
+    margin: auto;
+    display: block;
+    max-width: 90%;
+    max-height: 80%;
+    position: relative;
+    top: 50%;
+    transform: translateY(-50%);
+}
+.close-lightbox {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: #f1f1f1;
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.close-lightbox:hover {
+    color: #bbb;
+}
+.lightbox-caption {
+    margin: 20px auto;
+    text-align: center;
+    color: #ccc;
+    max-width: 80%;
+}
+.download-btn {
+    background: #2d5f9e;
+    border: none;
+    border-radius: 20px;
+    padding: 6px 12px;
+    color: white;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin: 8px auto;
+    display: block;
+    width: fit-content;
+    transition: 0.2s;
+}
+.download-btn:hover {
+    background: #3b70b5;
+}
+.image-card {
+    padding-bottom: 10px; /* 为按钮留出空间 */
+}
+        .image-card .meta { padding: 0.5rem; font-size: 0.7rem; color: #95adcc; background: #0c131d; border-top: 1px solid #253545; }
+        .empty-gallery { grid-column: 1 / -1; text-align: center; color: #546e8a; font-size: 1.1rem; padding: 4rem 0; border: 2px dashed #25384d; border-radius: 40px; }
+        .loading-overlay { display: inline-block; margin-left: 10px; color: #7aa9ff; }
+        .error-msg { background: #4f2a2a; border-radius: 30px; padding: 0.5rem 1rem; color: #ffc1a0; font-size: 0.9rem; margin-top: 8px; border: 1px solid #b55a5a; }
+        footer { font-size: 0.7rem; color: #3b5170; text-align: center; margin-top: 1rem; }
+    </style>
+</head>
+<!-- 图片放大查看的模态框 -->
+<div id="lightbox-modal" class="lightbox" style="display: none;" onclick="closeLightbox()">
+    <span class="close-lightbox">&times;</span>
+    <img class="lightbox-content" id="lightbox-img">
+    <div class="lightbox-caption" id="lightbox-caption"></div>
+</div>
+<body>
+<div class="app">
+    <!-- 左侧配置面板 -->
+    <div class="sidebar">
+        <h2><span>🍌</span> Gemini · 生图工坊</h2>
+
+        <!-- API 凭证区 -->
+        <div class="control-group">
+            <label>🔐 API Key (ai.t8star.cn)</label>
+            <div class="input-row api-key-row">
+                <input type="password" id="apiKey" placeholder="输入您的 API Key" value="">
+            </div>
+            <div class="input-row">
+                <input type="text" id="apiBase" placeholder="API Base URL" value="https://ai.t8star.cn">
+                <div class="hint">默认使用 ai.t8star.cn</div>
+            </div>
+        </div>
+
+        <!-- 提示词 + 生成按钮 -->
+        <div class="control-group">
+            <label>📝 提示词</label>
+            <textarea id="prompt" placeholder="A beautiful neon cyberpunk cat, 8k, detailed ...">a serene landscape with floating islands, ethereal lighting</textarea>
+            <div class="input-row" style="margin-top: 10px;">
+                <label style="margin-bottom: 3px;">👎 负面提示 (可选)</label>
+                <input type="text" id="negativePrompt" placeholder="blurry, ugly, low quality" value="blurry, ugly, low quality">
+            </div>
+            <button class="primary" id="generateBtn" style="width:100%; margin-top: 15px; padding: 0.9rem;">✨ 生成图片</button>
+            <div id="loadingIndicator" style="display: none; text-align:center; margin-top: 8px;">⏳ 生成中... 请稍候</div>
+            <div id="errorMessage" class="error-msg" style="display: none;"></div>
+        </div>
+
+        <!-- 参考图上传 -->
+        <div class="control-group">
+            <label>🖼️ 参考图 (图生图 / 可选)</label>
+            <div class="file-upload-area">
+                <input type="file" id="refImage" accept="image/*" multiple>
+                <div class="file-preview" id="refPreview">
+                    <!-- 动态插入多个缩略图，无文件名 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 模型标识 (与 Gemini 模型名称一致) -->
+        <div class="control-group">
+            <label>🧠 模型名称</label>
+            <div class="model-select-row">
+                <select id="modelPreset">
+                    <option value="gemini-3.1-flash-image-preview">nano banana 2</option>
+                    <option value="gemini-2.0-flash-exp-image-generation">gemini-2.0-flash-exp-image-generation</option>
+                    <option value="custom">✏️ 自定义...</option>
+                </select>
+                <input type="text" id="modelKey" placeholder="输入模型名" value="gemini-3.1-flash-image-preview">
+            </div>
+            <div class="hint">选择预设或手动输入模型标识</div>
+        </div>
+
+        <!-- 比例 + 尺寸 + 张数 -->
+        <div class="control-group">
+            <div style="display: flex; justify-content: space-between;">
+                <label>📐 比例</label>
+                <label>🔍 尺寸档次</label>
+            </div>
+            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                <div class="radio-row" id="aspectGroup">
+                    <div class="radio-item">
+                        <input type="radio" name="aspect" id="ratio9x16" value="9:16"> <label for="ratio9x16">9:16 竖屏</label>
+                    </div>
+                    <div class="radio-item">
+                        <input type="radio" name="aspect" id="ratio16x9" value="16:9" checked> <label for="ratio16x9">16:9 横屏</label>
+                    </div>
+                </div>
+                <div class="radio-row" id="sizeGroup">
+                    <div class="radio-item"><input type="radio" name="size" value="1k" checked> 1K</div>
+                    <div class="radio-item"><input type="radio" name="size" value="2k"> 2K</div>
+                    <div class="radio-item"><input type="radio" name="size" value="4k"> 4K</div>
+                </div>
+            </div>
+            <div style="margin-top: 16px;">
+                <label>🔢 一次生成张数</label>
+                <select id="batchCount">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                </select>
+                <div class="hint">注意：每张图将独立请求，消耗对应次数配额。</div>
+            </div>
+        </div>
+
+        <footer>
+            ⚡ 适配 ai.t8star.cn · 点击图片可放大
+        </footer>
+    </div>
+
+    <!-- 右侧画廊 -->
+    <div class="gallery">
+        <h3>🖼️ 生成作品集 · 最大展示区 <span id="imageCount"></span></h3>
+        <div class="image-grid" id="galleryGrid">
+            <div class="empty-gallery">✨ 生成的图片会出现在这里</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // DOM 元素
+        const apiKeyInput = document.getElementById('apiKey');
+        const apiBaseInput = document.getElementById('apiBase');
+        const promptInput = document.getElementById('prompt');
+        const negativePromptInput = document.getElementById('negativePrompt');
+        const generateBtn = document.getElementById('generateBtn');
+        const loadingSpan = document.getElementById('loadingIndicator');
+        const errorDiv = document.getElementById('errorMessage');
+        const refImageInput = document.getElementById('refImage');
+        const refPreviewDiv = document.getElementById('refPreview');
+        const modelPreset = document.getElementById('modelPreset');
+        const modelKeyInput = document.getElementById('modelKey');
+        const batchCountSelect = document.getElementById('batchCount');
+        const galleryGrid = document.getElementById('galleryGrid');
+        const imageCountSpan = document.getElementById('imageCount');
+
+        // 预设模型联动
+        modelPreset.addEventListener('change', (e) => {
+            if (e.target.value !== 'custom') {
+                modelKeyInput.value = e.target.value;
+            } else {
+                modelKeyInput.value = '';
+                modelKeyInput.focus();
+            }
+        });
+
+        // 图片预览
+        refImageInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    const previewDiv = document.getElementById('refPreview');
+    previewDiv.innerHTML = ''; // 清空预览区
+
+    if (files.length === 0) {
+        // 没有文件时显示占位符
+        const placeholder = document.createElement('div');
+        placeholder.className = 'placeholder';
+        placeholder.textContent = '📷';
+        previewDiv.appendChild(placeholder);
+        refImageInput._base64Array = [];
+        return;
+    }
+
+    const base64Promises = files.map((file) => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                resolve({
+                    base64: ev.target.result.split(',')[1],
+                    dataUrl: ev.target.result,
+                    name: file.name
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+    });
+
+    Promise.all(base64Promises).then(results => {
+        // 存储纯 base64 数组
+        refImageInput._base64Array = results.map(r => r.base64);
+
+        // 创建所有缩略图容器并添加到预览区
+        results.forEach((result, index) => {
+            const thumbContainer = createThumbnail(result.dataUrl, index + 1, result.base64);
+            previewDiv.appendChild(thumbContainer);
+        });
+
+        // 绑定移除按钮事件
+        bindRemoveEvents();
+    });
+});
+
+// 创建单个缩略图容器（包含图片、序号、移除按钮）
+function createThumbnail(dataUrl, index, base64Data) {
+    const container = document.createElement('div');
+    container.className = 'thumb-container';
+    container.dataset.base64 = base64Data; // 保存 base64，便于移除时查找
+
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.className = 'thumb';
+
+    const indexSpan = document.createElement('span');
+    indexSpan.className = 'thumb-index';
+    indexSpan.textContent = index;
+
+    const removeBtn = document.createElement('span');
+    removeBtn.className = 'thumb-remove';
+    removeBtn.innerHTML = '&times;'; // 乘号 ✕
+
+    container.appendChild(img);
+    container.appendChild(indexSpan);
+    container.appendChild(removeBtn);
+
+    return container;
+}
+
+// 绑定移除事件，并更新剩余图片的序号
+function bindRemoveEvents() {
+    const previewDiv = document.getElementById('refPreview');
+    const removeButtons = previewDiv.querySelectorAll('.thumb-remove');
+    removeButtons.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const container = this.closest('.thumb-container');
+            if (!container) return;
+
+            // 获取要移除的 base64 数据
+            const base64ToRemove = container.dataset.base64;
+
+            // 从 DOM 中移除该容器
+            container.remove();
+
+            // 从 _base64Array 中删除对应的项
+            const currentArray = refImageInput._base64Array;
+            const indexToRemove = currentArray.findIndex(b64 => b64 === base64ToRemove);
+            if (indexToRemove !== -1) {
+                currentArray.splice(indexToRemove, 1);
+            }
+
+            // 更新剩余容器的序号（重新从1开始编号）
+            const remainingContainers = previewDiv.querySelectorAll('.thumb-container');
+            remainingContainers.forEach((cont, idx) => {
+                const indexSpan = cont.querySelector('.thumb-index');
+                if (indexSpan) {
+                    indexSpan.textContent = idx + 1;
+                }
+            });
+
+            // 如果所有图片都被移除，显示占位符
+            if (remainingContainers.length === 0) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'placeholder';
+                placeholder.textContent = '📷';
+                previewDiv.appendChild(placeholder);
+                refImageInput._base64Array = [];
+            }
+        });
+    });
+}
+
+        // 根据比例和尺寸计算 imageSize 字符串 (如 "1024x576")
+        function getImageSize(aspect, size) {
+            const longSide = size === '1k' ? 1024 : (size === '2k' ? 2048 : 4096);
+            let width, height;
+            if (aspect === '9:16') { // 竖屏
+                height = longSide;
+                width = Math.round(longSide * 9 / 16);
+            } else { // 16:9 横屏
+                width = longSide;
+                height = Math.round(longSide * 9 / 16);
+            }
+            return `${width}x${height}`;
+        }
+
+        // 显示错误
+        function showError(msg) {
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = '❌ ' + msg;
+        }
+        function hideError() {
+            errorDiv.style.display = 'none';
+        }
+
+        // 添加图片到画廊
+        function addImagesToGallery(imageBase64List, promptUsed) {
+    if (!imageBase64List || imageBase64List.length === 0) return;
+    if (galleryGrid.children.length === 1 && galleryGrid.children[0].classList.contains('empty-gallery')) {
+        galleryGrid.innerHTML = '';
+    }
+    imageBase64List.forEach(src => {
+        const card = document.createElement('div');
+        card.className = 'image-card';
+
+        const img = document.createElement('img');
+        img.src = src.startsWith('data:') ? src : 'data:image/png;base64,' + src;
+        img.alt = 'generated';
+        img.loading = 'lazy';
+        
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = promptUsed.slice(0, 35) + (promptUsed.length > 35 ? '…' : '');
+
+        // 下载按钮
+        const downloadBtn = document.createElement('button');
+        downloadBtn.textContent = '⬇️ 下载';
+        downloadBtn.className = 'download-btn';
+        downloadBtn.onclick = function(e) {
+            e.stopPropagation();
+            downloadImage(img.src, promptUsed.slice(0, 20) || 'image');
+        };
+
+        // 点击图片打开模态框
+        img.onclick = function() {
+            openLightbox(this.src, meta.textContent);
+        };
+
+        card.appendChild(img);
+        card.appendChild(meta);
+        card.appendChild(downloadBtn);
+        galleryGrid.appendChild(card);
+    });
+    updateImageCount();
+}
+
+        function updateImageCount() {
+            const count = galleryGrid.querySelectorAll('.image-card').length;
+            imageCountSpan.textContent = count ? `(${count}张)` : '';
+        }
+
+        // 核心调用：向 Gemini 兼容 API 发送生成请求
+        async function callGeminiGeneration(apiKey, baseURL, model, prompt, negativePrompt, imageSize, initImagesBase64 = []) {
+    const parts = [];
+    
+    // 将负面提示拼接到 prompt 中
+    let finalPrompt = prompt;
+    if (negativePrompt && negativePrompt.trim() !== '') {
+        finalPrompt = `Positive: ${prompt}\nNegative: ${negativePrompt}`;
+    }
+    parts.push({ text: finalPrompt });
+
+    // 添加多张参考图
+    if (initImagesBase64 && initImagesBase64.length > 0) {
+        initImagesBase64.forEach(base64 => {
+            parts.push({
+                inlineData: {
+                    mimeType: "image/png", // 假设都是 png，实际可根据文件类型动态判断
+                    data: base64
+                }
+            });
+        });
+    }
+
+    const requestBody = {
+        contents: [
+            {
+                role: "user",
+                parts: parts
+            }
+        ],
+        generationConfig: {
+            temperature: 1,
+            topK: 32,
+            topP: 1,
+            maxOutputTokens: 2048,
+            responseModalities: ["image"],
+            imageSize: imageSize
+        }
+    };
+
+    // 构建 URL: {baseURL}/v1beta/models/{model}:generateContent
+    const endpoint = baseURL.replace(/\/$/, '') + `/v1beta/models/${model}:generateContent`;
+
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
+        },
+        body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    if (!data.candidates || data.candidates.length === 0) {
+        throw new Error('未返回任何图片');
+    }
+    const partsResp = data.candidates[0].content.parts;
+    for (const part of partsResp) {
+        if (part.inlineData && part.inlineData.data) {
+            return part.inlineData.data; // 返回纯 base64
+        }
+    }
+    throw new Error('响应中未找到图片数据');
+}
+
+        // 生成主流程（支持多张并发）
+        async function onGenerate() {
+            const apiKey = apiKeyInput.value.trim();
+            const baseURL = apiBaseInput.value.trim() || 'https://ai.t8star.cn';
+            const model = modelKeyInput.value.trim();
+            const prompt = promptInput.value.trim();
+            const negativePrompt = negativePromptInput.value.trim();
+            const aspect = document.querySelector('input[name="aspect"]:checked')?.value || '9:16';
+            const size = document.querySelector('input[name="size"]:checked')?.value || '1k';
+            const batchCount = parseInt(batchCountSelect.value, 10);
+            const refBase64 = refImageInput._base64; // 纯base64字符串或null
+
+            if (!apiKey) { showError('请输入 API Key'); return; }
+            if (!model) { showError('请输入模型名称'); return; }
+            if (!prompt) { showError('提示词不能为空'); return; }
+
+            const imageSize = getImageSize(aspect, size);
+
+            hideError();
+            loadingSpan.style.display = 'inline-block';
+            generateBtn.disabled = true;
+
+            try {
+                // 并发请求 (每个请求生成一张图)
+                const requests = [];
+                for (let i = 0; i < batchCount; i++) {
+                    requests.push(callGeminiGeneration(apiKey, baseURL, model, prompt, negativePrompt, imageSize, refBase64));
+                }
+                const results = await Promise.all(requests); // results 是 base64 数组
+                addImagesToGallery(results, prompt);
+            } catch (err) {
+                showError(err.message || '生成失败，请检查参数或网络');
+                console.error(err);
+            } finally {
+                loadingSpan.style.display = 'none';
+                generateBtn.disabled = false;
+            }
+        }
+
+        generateBtn.addEventListener('click', onGenerate);
+
+        // 可选：回车快捷
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                generateBtn.click();
+            }
+        });
+
+        hideError();
+    })();
+    // 打开大图模态框
+function openLightbox(imgSrc, caption) {
+    document.getElementById('lightbox-img').src = imgSrc;
+    document.getElementById('lightbox-caption').textContent = caption || '';
+    document.getElementById('lightbox-modal').style.display = 'block';
+}
+
+// 关闭模态框
+function closeLightbox() {
+    document.getElementById('lightbox-modal').style.display = 'none';
+}
+
+// 点击模态框背景关闭
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('lightbox-modal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLightbox();
+            }
+        });
+    }
+});
+
+// 下载图片
+function downloadImage(imgSrc, filename = 'image') {
+    const link = document.createElement('a');
+    link.href = imgSrc;
+    link.download = filename + '.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+</script>
+<!-- 
+  使用说明：
+  1. 在 API Key 输入框中填写您的有效密钥。
+  2. 选择或输入模型名称（例如 gemini-3.1-flash-image-preview）。
+  3. 填写提示词，可选择上传参考图。
+  4. 选择比例、尺寸和张数后点击生成。
+  5. 生成的图片会显示在右侧画廊，点击可放大。
+  注意：该页面假设服务支持 Gemini 风格的 HTTP API，并且使用 x-goog-api-key 头认证。
+  如果实际服务需要不同的认证方式或请求格式，请根据文档调整代码。
+-->

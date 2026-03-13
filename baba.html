@@ -304,6 +304,16 @@
 
 <script>
     (function() {
+    // 从 localStorage 加载已保存的图片
+let galleryImages = [];
+try {
+    const saved = localStorage.getItem('generatedImages');
+    if (saved) {
+        galleryImages = JSON.parse(saved);
+    }
+} catch (e) {
+    console.warn('读取缓存失败', e);
+}
         // DOM 元素
         const apiKeyInput = document.getElementById('apiKey');
         const apiBaseInput = document.getElementById('apiBase');
@@ -466,45 +476,67 @@ function bindRemoveEvents() {
         function hideError() {
             errorDiv.style.display = 'none';
         }
+// 创建一个图片卡片元素（不自动添加到页面）
+function createImageCard(imgSrc, promptText) {
+    const card = document.createElement('div');
+    card.className = 'image-card';
 
+    const img = document.createElement('img');
+    img.src = imgSrc;
+    img.alt = 'generated';
+    img.loading = 'lazy';
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = promptText.slice(0, 35) + (promptText.length > 35 ? '…' : '');
+
+    // 下载按钮
+    const downloadBtn = document.createElement('button');
+    downloadBtn.textContent = '⬇️ 下载';
+    downloadBtn.className = 'download-btn';
+    downloadBtn.onclick = function(e) {
+        e.stopPropagation();
+        downloadImage(imgSrc, promptText.slice(0, 20) || 'image');
+    };
+
+    // 点击图片打开模态框
+    img.onclick = function() {
+        openLightbox(imgSrc, meta.textContent);
+    };
+
+    card.appendChild(img);
+    card.appendChild(meta);
+    card.appendChild(downloadBtn);
+    return card;
+}
         // 添加图片到画廊
         function addImagesToGallery(imageBase64List, promptUsed) {
     if (!imageBase64List || imageBase64List.length === 0) return;
+
+    // 移除空画廊占位符
     if (galleryGrid.children.length === 1 && galleryGrid.children[0].classList.contains('empty-gallery')) {
         galleryGrid.innerHTML = '';
     }
+
+    // 处理每一张新图片
     imageBase64List.forEach(src => {
-        const card = document.createElement('div');
-        card.className = 'image-card';
-
-        const img = document.createElement('img');
-        img.src = src.startsWith('data:') ? src : 'data:image/png;base64,' + src;
-        img.alt = 'generated';
-        img.loading = 'lazy';
+        // 确保 src 是完整的 dataURL
+        const fullSrc = src.startsWith('data:') ? src : 'data:image/png;base64,' + src;
         
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-        meta.textContent = promptUsed.slice(0, 35) + (promptUsed.length > 35 ? '…' : '');
+        // 创建卡片并插入到最前面
+        const card = createImageCard(fullSrc, promptUsed);
+        galleryGrid.insertBefore(card, galleryGrid.firstChild);
 
-        // 下载按钮
-        const downloadBtn = document.createElement('button');
-        downloadBtn.textContent = '⬇️ 下载';
-        downloadBtn.className = 'download-btn';
-        downloadBtn.onclick = function(e) {
-            e.stopPropagation();
-            downloadImage(img.src, promptUsed.slice(0, 20) || 'image');
-        };
-
-        // 点击图片打开模态框
-        img.onclick = function() {
-            openLightbox(this.src, meta.textContent);
-        };
-
-        card.appendChild(img);
-        card.appendChild(meta);
-        card.appendChild(downloadBtn);
-        galleryGrid.appendChild(card);
+        // 将图片信息存入 galleryImages 数组最前面
+        galleryImages.unshift({ src: fullSrc, prompt: promptUsed });
     });
+
+    // 保存到 localStorage（限制最多保存 30 张，避免超出容量）
+    if (galleryImages.length > 30) {
+        galleryImages = galleryImages.slice(0, 30);
+    }
+    localStorage.setItem('generatedImages', JSON.stringify(galleryImages));
+
     updateImageCount();
 }
 
@@ -666,6 +698,34 @@ function downloadImage(imgSrc, filename = 'image') {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+// 页面加载时从 localStorage 恢复图片
+function loadGalleryFromStorage() {
+    if (galleryImages.length === 0) {
+        // 显示空占位符（如果画廊为空）
+        if (galleryGrid.children.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'empty-gallery';
+            emptyDiv.textContent = '✨ 生成的图片会出现在这里';
+            galleryGrid.appendChild(emptyDiv);
+        }
+        return;
+    }
+
+    // 清空画廊，然后重新渲染所有图片
+    galleryGrid.innerHTML = '';
+    galleryImages.forEach(item => {
+        const card = createImageCard(item.src, item.prompt);
+        galleryGrid.appendChild(card); // 此时 galleryImages 顺序是最新在前，appendChild 保持该顺序
+    });
+    updateImageCount();
+}
+
+// 在 DOM 加载完成后调用
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadGalleryFromStorage);
+} else {
+    loadGalleryFromStorage();
 }
 </script>
 <!-- 

@@ -31,6 +31,19 @@
         button.primary:hover { background: #3b70b5; }
         button:hover { background: #324b68; }
         .disabled-option {opacity: 0.5;pointer-events: none;}
+        .user-btn {
+    background: #2b3d54;
+    border: 1px solid #406080;
+    border-radius: 20px;
+    padding: 6px 0;
+    color: white;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.user-btn.active {
+    background: #2d5f9e;
+    border-color: #6298da;
+}
         .radio-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
         .radio-item { display: flex; align-items: center; gap: 5px; }
         .radio-item input[type="radio"] { width: auto; accent-color: #4f8ed8; }
@@ -87,6 +100,15 @@
                 <div class="hint">默认使用 ai.t8star.cn</div>
             </div>
         </div>
+        <!-- 在这里插入用户切换代码 -->
+<div class="control-group">
+    <label>👥 切换用户</label>
+    <div style="display: flex; gap: 10px;">
+        <button id="user1Btn" class="user-btn active" style="flex:1;">用户 A</button>
+        <button id="user2Btn" class="user-btn" style="flex:1;">用户 B</button>
+    </div>
+    <div id="userHint" style="font-size:0.8rem; color:#9ab3d1; margin-top:5px;">当前图片保存在用户 A 的存储中</div>
+</div>
 
         <div class="control-group">
             <label>📝 提示词</label>
@@ -180,15 +202,26 @@
 
 <script>
 (function() {
-    // ========== 全局变量 ==========
-    var currentUser = 'user1'; // 如果还没定义，需要加上这一行（通常已定义）
+   // ========== 全局变量 ==========
+var currentUser = 'user1'; // 如果还没定义，需要加上这一行（通常已定义）
 var galleryImages = [];
 try {
-    // 根据当前用户动态构建存储键
+    // 先尝试读取当前用户的新键
     var saved = localStorage.getItem('galleryImages_' + currentUser);
     if (saved) {
         galleryImages = JSON.parse(saved);
         console.log('从缓存读取到', galleryImages.length, '张图片（用户', currentUser + '）');
+    } else if (currentUser === 'user1') {
+        // 如果是用户A且新键不存在，尝试读取旧键并迁移
+        var oldSaved = localStorage.getItem('generatedImages');
+        if (oldSaved) {
+            galleryImages = JSON.parse(oldSaved);
+            // 保存到新键
+            localStorage.setItem('galleryImages_user1', oldSaved);
+            // 可选：删除旧键
+            localStorage.removeItem('generatedImages');
+            console.log('已从旧数据迁移', galleryImages.length, '张图片到用户A');
+        }
     }
 } catch (e) {
     console.warn('读取缓存失败', e);
@@ -641,6 +674,43 @@ modelPreset.addEventListener('change', (e) => {
         }
     }
     ready(loadGalleryFromStorage);
+    
+// 用户切换函数
+function switchUser(user) {
+    if (user === currentUser) return; // 相同用户无需切换
+    currentUser = user;
+    
+    // 更新按钮样式
+    document.getElementById('user1Btn').classList.toggle('active', user === 'user1');
+    document.getElementById('user2Btn').classList.toggle('active', user === 'user2');
+    
+    // 更新提示
+    document.getElementById('userHint').textContent = `当前图片保存在用户 ${user === 'user1' ? 'A' : 'B'} 的存储中`;
+    
+    // 从对应存储加载图片
+    try {
+        var saved = localStorage.getItem('galleryImages_' + currentUser);
+        galleryImages = saved ? JSON.parse(saved) : [];
+    } catch (e) {
+        galleryImages = [];
+    }
+    
+    // 重新渲染画廊
+    galleryGrid.innerHTML = '';
+    if (galleryImages.length === 0) {
+        galleryGrid.innerHTML = '<div class="empty-gallery">✨ 该用户暂无图片</div>';
+    } else {
+        galleryImages.forEach(item => {
+            const card = createImageCard(item.src, item.prompt);
+            galleryGrid.appendChild(card);
+        });
+    }
+    updateImageCount();
+}
+
+// 绑定按钮点击事件
+document.getElementById('user1Btn').addEventListener('click', () => switchUser('user1'));
+document.getElementById('user2Btn').addEventListener('click', () => switchUser('user2'));
 
 })();
 </script>

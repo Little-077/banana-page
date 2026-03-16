@@ -137,6 +137,10 @@
                     <div class="radio-item">
                         <input type="radio" name="aspect" id="ratio16x9" value="16:9" checked> <label for="ratio16x9">16:9 横屏</label>
                     </div>
+                    <!-- 新增 1:1 选项 -->
+                    <div class="radio-item">
+                          <input type="radio" name="aspect" id="ratio1x1" value="1:1"> <label for="ratio1x1">1:1 正方形</label>
+                    </div>
                 </div>
                 <div class="radio-row" id="sizeGroup">
                     <div class="radio-item"><input type="radio" name="size" value="1k" checked> 1K</div>
@@ -177,16 +181,18 @@
 <script>
 (function() {
     // ========== 全局变量 ==========
-    var galleryImages = [];  // 使用 var 确保函数内可访问
-    try {
-        var saved = localStorage.getItem('generatedImages');
-        if (saved) {
-            galleryImages = JSON.parse(saved);
-            console.log('从缓存读取到', galleryImages.length, '张图片');
-        }
-    } catch (e) {
-        console.warn('读取缓存失败', e);
+    var currentUser = 'user1'; // 如果还没定义，需要加上这一行（通常已定义）
+var galleryImages = [];
+try {
+    // 根据当前用户动态构建存储键
+    var saved = localStorage.getItem('galleryImages_' + currentUser);
+    if (saved) {
+        galleryImages = JSON.parse(saved);
+        console.log('从缓存读取到', galleryImages.length, '张图片（用户', currentUser + '）');
     }
+} catch (e) {
+    console.warn('读取缓存失败', e);
+}
 
     // DOM 元素
     const apiKeyInput = document.getElementById('apiKey');
@@ -205,18 +211,25 @@
     const imageCountSpan = document.getElementById('imageCount');
 
     // ========== 辅助函数 ==========
-    function getImageSize(aspect, size) {
-        const longSide = size === '1k' ? 1024 : (size === '2k' ? 2048 : 4096);
-        let width, height;
-        if (aspect === '9:16') {
-            height = longSide;
-            width = Math.round(longSide * 9 / 16);
-        } else {
-            width = longSide;
-            height = Math.round(longSide * 9 / 16);
-        }
-        return `${width}x${height}`;
+   function getImageSize(aspect, size) {
+    const longSide = size === '1k' ? 1024 : (size === '2k' ? 2048 : 4096);
+    let width, height;
+    if (aspect === '9:16') { // 竖屏
+        height = longSide;
+        width = Math.round(longSide * 9 / 16);
+    } else if (aspect === '16:9') { // 横屏
+        width = longSide;
+        height = Math.round(longSide * 9 / 16);
+    } else if (aspect === '1:1') { // 正方形
+        width = longSide;
+        height = longSide;
+    } else {
+        // 默认横屏
+        width = longSide;
+        height = Math.round(longSide * 9 / 16);
     }
+    return `${width}x${height}`;
+}
 
     function showError(msg) {
         errorDiv.style.display = 'block';
@@ -308,7 +321,7 @@ meta.addEventListener('click', async function() {
         if (galleryImages.length > 30) {
             galleryImages = galleryImages.slice(0, 30);
         }
-        localStorage.setItem('generatedImages', JSON.stringify(galleryImages));
+        localStorage.setItem('galleryImages_' + currentUser, JSON.stringify(galleryImages));
         console.log('已保存', galleryImages.length, '张图片到缓存');
         updateImageCount();
     }
@@ -628,6 +641,42 @@ modelPreset.addEventListener('change', (e) => {
         }
     }
     ready(loadGalleryFromStorage);
+// 用户切换函数
+function switchUser(user) {
+    if (user === currentUser) return; // 相同用户无需切换
+    currentUser = user;
+    
+    // 更新按钮样式
+    document.getElementById('user1Btn').classList.toggle('active', user === 'user1');
+    document.getElementById('user2Btn').classList.toggle('active', user === 'user2');
+    
+    // 更新提示
+    document.getElementById('userHint').textContent = `当前图片保存在用户 ${user === 'user1' ? 'A' : 'B'} 的存储中`;
+    
+    // 从对应存储加载图片
+    try {
+        var saved = localStorage.getItem('galleryImages_' + currentUser);
+        galleryImages = saved ? JSON.parse(saved) : [];
+    } catch (e) {
+        galleryImages = [];
+    }
+    
+    // 重新渲染画廊
+    galleryGrid.innerHTML = '';
+    if (galleryImages.length === 0) {
+        galleryGrid.innerHTML = '<div class="empty-gallery">✨ 该用户暂无图片</div>';
+    } else {
+        galleryImages.forEach(item => {
+            const card = createImageCard(item.src, item.prompt);
+            galleryGrid.appendChild(card);
+        });
+    }
+    updateImageCount();
+}
+
+// 绑定按钮点击事件
+document.getElementById('user1Btn').addEventListener('click', () => switchUser('user1'));
+document.getElementById('user2Btn').addEventListener('click', () => switchUser('user2'));
 
 })();
 </script>

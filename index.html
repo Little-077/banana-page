@@ -641,42 +641,6 @@ modelPreset.addEventListener('change', (e) => {
         }
     }
     ready(loadGalleryFromStorage);
-// 用户切换函数
-function switchUser(user) {
-    if (user === currentUser) return; // 相同用户无需切换
-    currentUser = user;
-    
-    // 更新按钮样式
-    document.getElementById('user1Btn').classList.toggle('active', user === 'user1');
-    document.getElementById('user2Btn').classList.toggle('active', user === 'user2');
-    
-    // 更新提示
-    document.getElementById('userHint').textContent = `当前图片保存在用户 ${user === 'user1' ? 'A' : 'B'} 的存储中`;
-    
-    // 从对应存储加载图片
-    try {
-        var saved = localStorage.getItem('galleryImages_' + currentUser);
-        galleryImages = saved ? JSON.parse(saved) : [];
-    } catch (e) {
-        galleryImages = [];
-    }
-    
-    // 重新渲染画廊
-    galleryGrid.innerHTML = '';
-    if (galleryImages.length === 0) {
-        galleryGrid.innerHTML = '<div class="empty-gallery">✨ 该用户暂无图片</div>';
-    } else {
-        galleryImages.forEach(item => {
-            const card = createImageCard(item.src, item.prompt);
-            galleryGrid.appendChild(card);
-        });
-    }
-    updateImageCount();
-}
-
-// 绑定按钮点击事件
-document.getElementById('user1Btn').addEventListener('click', () => switchUser('user1'));
-document.getElementById('user2Btn').addEventListener('click', () => switchUser('user2'));
 
 })();
 </script>

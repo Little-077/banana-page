@@ -203,30 +203,7 @@
 
 <script>
 (function() {
-   // ========== 全局变量 ==========
-var currentUser = 'user1'; // 如果还没定义，需要加上这一行（通常已定义）
-var galleryImages = [];
-try {
-    // 先尝试读取当前用户的新键
-    var saved = localStorage.getItem('galleryImages_' + currentUser);
-    if (saved) {
-        galleryImages = JSON.parse(saved);
-        console.log('从缓存读取到', galleryImages.length, '张图片（用户', currentUser + '）');
-    } else if (currentUser === 'user1') {
-        // 如果是用户A且新键不存在，尝试读取旧键并迁移
-        var oldSaved = localStorage.getItem('generatedImages');
-        if (oldSaved) {
-            galleryImages = JSON.parse(oldSaved);
-            // 保存到新键
-            localStorage.setItem('galleryImages_user1', oldSaved);
-            // 可选：删除旧键
-            localStorage.removeItem('generatedImages');
-            console.log('已从旧数据迁移', galleryImages.length, '张图片到用户A');
-        }
-    }
-} catch (e) {
-    console.warn('读取缓存失败', e);
-}
+
 
     // DOM 元素
     const apiKeyInput = document.getElementById('apiKey');
@@ -351,13 +328,6 @@ meta.addEventListener('click', async function() {
             galleryImages.unshift({ src: fullSrc, prompt: promptUsed }); // 存入数组最前面
         });
 
-        // 限制最多保存 30 张
-        if (galleryImages.length > 30) {
-            galleryImages = galleryImages.slice(0, 30);
-        }
-        localStorage.setItem('galleryImages_' + currentUser, JSON.stringify(galleryImages));
-        console.log('已保存', galleryImages.length, '张图片到缓存');
-        updateImageCount();
     }
 
     // 从缓存加载图片
@@ -727,13 +697,7 @@ async function loadUserTabs() {
                 { id: 'user1', name: '用户 A' },
                 { id: 'user2', name: '用户 B' }
             ];
-            // 尝试迁移旧 localStorage 数据
-            var oldData = localStorage.getItem('generatedImages');
-            if (oldData) {
-                await idbKeyval.set('galleryImages_user1', JSON.parse(oldData));
-                localStorage.removeItem('generatedImages');
-                console.log('已迁移旧数据到用户 A');
-            }
+           
         }
 
         var lastUserId = await idbKeyval.get('currentUserId');

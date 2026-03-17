@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍌</text></svg>">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -139,6 +140,8 @@
                 <select id="modelPreset">
                     <option value="gemini-3.1-flash-image-preview">香蕉2 -0.02/张</option>
                     <option value="gemini-2.5-flash-image">香蕉 -0.04/张</option>
+                    <option value="gemini-2.0-flash-exp-image-generation">gemini-2.0-flash-exp-image-generation</option>
+                    <option value="custom">✏️ 自定义...</option>
                 </select>
                 <input type="text" id="modelKey" placeholder="输入模型名" value="gemini-3.1-flash-image-preview">
             </div>
@@ -663,15 +666,24 @@ modelPreset.addEventListener('change', (e) => {
         }
     });
 
-    // ========== 页面加载完成后恢复图片 ==========
-    function ready(fn) {
-        if (document.readyState !== 'loading') {
-            fn();
-        } else {
-            document.addEventListener('DOMContentLoaded', fn);
-        }
+    // ========== 页面加载后初始化 IndexedDB 用户数据 ==========
+document.addEventListener('DOMContentLoaded', async function() {
+    // 等待用户标签页加载（会自动加载当前用户的图片）
+    await loadUserTabs();
+
+    // 绑定添加标签页按钮
+    const addBtn = document.getElementById('addTabBtn');
+    if (addBtn) {
+        addBtn.addEventListener('click', addNewUser);
     }
-    ready(loadGalleryFromStorage);
+
+    // 绑定生成按钮（如果原来有绑定，确保不重复）
+    const generateBtn = document.getElementById('generateBtn');
+    if (generateBtn && !generateBtn._hasListener) {
+        generateBtn.addEventListener('click', onGenerate);
+        generateBtn._hasListener = true; // 简单防重复标记
+    }
+
     
 // 用户切换函数
 function switchUser(user) {
@@ -685,13 +697,6 @@ function switchUser(user) {
     // 更新提示
     document.getElementById('userHint').textContent = `当前图片保存在用户 ${user === 'user1' ? 'A' : 'B'} 的存储中`;
     
-    // 从对应存储加载图片
-    try {
-        var saved = localStorage.getItem('galleryImages_' + currentUser);
-        galleryImages = saved ? JSON.parse(saved) : [];
-    } catch (e) {
-        galleryImages = [];
-    }
     
     // 重新渲染画廊
     galleryGrid.innerHTML = '';
@@ -710,6 +715,171 @@ function switchUser(user) {
 document.getElementById('user1Btn').addEventListener('click', () => switchUser('user1'));
 document.getElementById('user2Btn').addEventListener('click', () => switchUser('user2'));
 
+// ========== 用户标签页相关函数 (IndexedDB 版本) ==========
+async function loadUserTabs() {
+    try {
+        var tabsSaved = await idbKeyval.get('userTabs');
+        if (tabsSaved) {
+            userTabs = tabsSaved;
+        } else {
+            // 默认两个用户
+            userTabs = [
+                { id: 'user1', name: '用户 A' },
+                { id: 'user2', name: '用户 B' }
+            ];
+            // 尝试迁移旧 localStorage 数据
+            var oldData = localStorage.getItem('generatedImages');
+            if (oldData) {
+                await idbKeyval.set('galleryImages_user1', JSON.parse(oldData));
+                localStorage.removeItem('generatedImages');
+                console.log('已迁移旧数据到用户 A');
+            }
+        }
+
+        var lastUserId = await idbKeyval.get('currentUserId');
+        if (lastUserId && userTabs.some(t => t.id === lastUserId)) {
+            currentUserId = lastUserId;
+        } else {
+            currentUserId = userTabs[0].id;
+        }
+
+        renderTabs();
+        await loadGalleryForUser(currentUserId);
+    } catch (e) {
+        console.warn('加载用户数据失败', e);
+    }
+}
+
+async function saveUserTabs() {
+    try {
+        await idbKeyval.set('userTabs', userTabs);
+        await idbKeyval.set('currentUserId', currentUserId);
+    } catch (e) {
+        console.warn('保存用户数据失败', e);
+    }
+}
+
+async function loadGalleryForUser(userId) {
+    try {
+        var saved = await idbKeyval.get('galleryImages_' + userId);
+        galleryImages = saved || [];
+    } catch (e) {
+        galleryImages = [];
+    }
+    galleryGrid.innerHTML = '';
+    if (galleryImages.length === 0) {
+        galleryGrid.innerHTML = '<div class="empty-gallery">✨ 该用户暂无图片</div>';
+    } else {
+        galleryImages.forEach(item => {
+            var card = createImageCard(item.src, item.prompt);
+            galleryGrid.appendChild(card);
+        });
+    }
+    updateImageCount();
+    console.log('已加载用户', userId, '的图片', galleryImages.length);
+}
+
+async function deleteUser(userId) {
+    var index = userTabs.findIndex(t => t.id === userId);
+    if (index === -1) return;
+    userTabs.splice(index, 1);
+
+    if (userId === currentUserId) {
+        currentUserId = userTabs[0].id;
+    }
+
+    try {
+        await idbKeyval.del('galleryImages_' + userId);
+    } catch (e) {
+        console.warn('删除图片数据失败', e);
+    }
+
+    await saveUserTabs();
+    renderTabs();
+    await loadGalleryForUser(currentUserId);
+}
+
+async function addNewUser() {
+    var newId = 'user' + (Date.now());
+    var newName = '用户 ' + (userTabs.length + 1);
+    userTabs.push({ id: newId, name: newName });
+    await saveUserTabs();
+    currentUserId = newId;
+    renderTabs();
+    await loadGalleryForUser(currentUserId);
+}
+
+async function switchUser(userId) {
+    if (userId === currentUserId) return;
+    currentUserId = userId;
+    await saveUserTabs();
+    renderTabs();
+    await loadGalleryForUser(currentUserId);
+}
+
+// 渲染纵向标签页 UI (保持不变，但注意里面调用了 enterEditModeVertical)
+function renderTabs() {
+    var container = document.getElementById('tabContainerVertical');
+    if (!container) return;
+    container.innerHTML = '';
+    userTabs.forEach(tab => {
+        var tabDiv = document.createElement('div');
+        tabDiv.className = 'tab-item-vertical' + (tab.id === currentUserId ? ' active' : '');
+        tabDiv.dataset.id = tab.id;
+
+        var nameSpan = document.createElement('span');
+        nameSpan.textContent = tab.name;
+        nameSpan.className = 'tab-name';
+
+        nameSpan.ondblclick = function(e) {
+            e.stopPropagation();
+            enterEditModeVertical(tabDiv, tab);
+        };
+
+        tabDiv.appendChild(nameSpan);
+
+        if (userTabs.length > 1) {
+            var closeSpan = document.createElement('span');
+            closeSpan.className = 'tab-close';
+            closeSpan.innerHTML = '&times;';
+            closeSpan.onclick = function(e) {
+                e.stopPropagation();
+                deleteUser(tab.id);
+            };
+            tabDiv.appendChild(closeSpan);
+        }
+
+        tabDiv.onclick = function(e) {
+            if (e.target.classList.contains('tab-close')) return;
+            switchUser(tab.id);
+        };
+
+        container.appendChild(tabDiv);
+    });
+}
+
+function enterEditModeVertical(tabDiv, tab) {
+    var nameSpan = tabDiv.querySelector('.tab-name');
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = tab.name;
+
+    input.onblur = function() {
+        var newName = this.value.trim() || '未命名';
+        tab.name = newName;
+        saveUserTabs();
+        renderTabs();
+    };
+    input.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+            this.blur();
+        }
+    };
+
+    nameSpan.replaceWith(input);
+    input.focus();
+    input.select();
+}
 })();
 </script>
 </body>

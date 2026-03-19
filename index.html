@@ -518,7 +518,7 @@
             document.querySelectorAll('input[name="size"]').forEach(r => r.disabled = false);
         }
     });
-   
+
     // ========== Gemini 调用 ==========
     async function callGeminiGeneration(apiKey, baseURL, model, prompt, negativePrompt, imageSize, initImagesBase64 = [], aspect = '16:9') {
         const parts = [];
@@ -851,7 +851,6 @@ async function deleteImageFromGallery(imgSrc) {
     document.addEventListener('DOMContentLoaded', async function() {
         await loadUserTabs();
         const addBtn = document.getElementById('addTabBtn');
-        document.getElementById('clearImagesBtn').addEventListener('click', clearCurrentUserImages);
         if (addBtn) addBtn.addEventListener('click', addNewUser);
         if (generateBtn && !generateBtn._hasListener) {
             generateBtn.addEventListener('click', onGenerate);
@@ -860,23 +859,7 @@ async function deleteImageFromGallery(imgSrc) {
         // 触发一次模型预设，以应用正确的尺寸提示
         modelPreset.dispatchEvent(new Event('change'));
     });
-    
-    
-    //=========清空缓存==============
-async function clearCurrentUserImages() {
-    if (!currentUserId) return;
-    if (!confirm(`确定要清空用户 ${userTabs.find(u => u.id === currentUserId)?.name || currentUserId} 的所有图片吗？`)) return;
-    
-    galleryImages = [];
-    await idbKeyval.set('galleryImages_' + currentUserId, galleryImages);
-    
-    // 重新渲染画廊
-    galleryGrid.innerHTML = '<div class="empty-gallery">✨ 该用户暂无图片</div>';
-    updateImageCount();
-    console.log('已清空当前用户的图片');
-}
-<button id="clearImagesBtn" style="margin-top:10px; width:100%;">🧹 清空当前用户图片</button>
-    
+
 })();
 </script>
 </body>
